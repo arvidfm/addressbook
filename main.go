@@ -166,7 +166,7 @@ func setup_endpoints(db *gorm.DB, enableLogging bool) *gin.Engine {
 		}
 
 		response := gin.H{
-			"status":    "success",
+			"success":   true,
 			"addresses": addresses,
 		}
 		if len(next_token) > 0 {

@@ -53,10 +53,21 @@ func (suite *AddressSuite) TearDownSuite() {
 	closeDB(suite)
 }
 
+type SuccessResponse struct {
+	Success *bool   `json:"success"`
+	Error   *string `json:"error"`
+}
+
 func (suite *AddressSuite) TestExample() {
 	w := suite.DoRequest("GET", "/address/12345", nil)
+	var response SuccessResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 
 	suite.NotEqual(200, w.Code)
+	if response.Success != nil {
+		suite.False(*response.Success)
+	}
+	suite.NotNil(response.Error)
 }
 
 func (suite *AddressSuite) TestPost() {
@@ -76,15 +87,16 @@ func (suite *AddressSuite) TestPost() {
 	w = suite.DoRequest("GET", fmt.Sprintf("/address/%v", response.ID), nil)
 	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	suite.True(response.Success)
-	suite.Equal(response.FirstName, "Jane")
-	suite.Equal(response.LastName, "Doe")
-	suite.Equal(response.Phone, "070000000")
+	suite.Equal("Jane", response.FirstName)
+	suite.Equal("Doe", response.LastName)
+	suite.Equal("070000000", response.Phone)
 }
 
 type AddressResponse struct {
-	Success   bool        `json:"success"`
+	Success   *bool       `json:"success"`
 	Next      *string     `json:"next"`
 	Addresses []Addresses `json:"addresses"`
+	Error     *string     `json:"error"`
 }
 
 func (suite *AddressSuite) TestPagination() {
@@ -119,18 +131,32 @@ func (suite *AddressSuite) TestPagination() {
 }
 
 func (suite *AddressSuite) TestPaginationLimit() {
-	var response AddressResponse
+	response := AddressResponse{}
 	_ = json.Unmarshal(suite.DoRequest("GET", "/address?limit=1000", nil).Body.Bytes(), &response)
-	suite.Equal(len(response.Addresses), 100)
+	suite.Equal(100, len(response.Addresses))
+	suite.NotNil(response.Success)
+	suite.True(*response.Success)
 
+	response = AddressResponse{}
 	_ = json.Unmarshal(suite.DoRequest("GET", "/address?limit=42", nil).Body.Bytes(), &response)
-	suite.Equal(len(response.Addresses), 42)
+	suite.Equal(42, len(response.Addresses))
+	suite.NotNil(response.Success)
+	suite.True(*response.Success)
 
+	response = AddressResponse{}
 	_ = json.Unmarshal(suite.DoRequest("GET", "/address?limit=-100", nil).Body.Bytes(), &response)
-	suite.Equal(len(response.Addresses), 20)
+	suite.Equal(20, len(response.Addresses))
+	suite.NotNil(response.Success)
+	suite.True(*response.Success)
 
+	response = AddressResponse{}
 	w := suite.DoRequest("GET", "/address?limit=asdf", nil)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	suite.NotEqual(200, w.Code)
+	if response.Success != nil {
+		suite.False(*response.Success)
+	}
+	suite.NotNil(response.Error)
 }
 
 func (suite *AddressSuite) TestSorting() {
@@ -168,21 +194,38 @@ func (suite *AddressSuite) TestSorting() {
 func (suite *AddressSuite) TestDelete() {
 	var response AddressResponse
 	_ = json.Unmarshal(suite.DoRequest("GET", "/address?search=Thomp", nil).Body.Bytes(), &response)
-	suite.Equal(len(response.Addresses), 1)
-	suite.Equal(response.Addresses[0].FirstName, "Angela")
-	suite.Equal(response.Addresses[0].LastName, "Thompson")
+	suite.Equal(1, len(response.Addresses))
+	suite.Equal("Angela", response.Addresses[0].FirstName)
+	suite.Equal("Thompson", response.Addresses[0].LastName)
 
+	address_response := SuccessResponse{}
 	w := suite.DoRequest("DELETE", fmt.Sprintf("/address/%v", response.Addresses[0].ID), nil)
-	suite.Equal(w.Code, 200)
+	_ = json.Unmarshal(w.Body.Bytes(), &address_response)
+	suite.Equal(200, w.Code)
+	suite.NotNil(address_response.Success)
+	suite.True(*address_response.Success)
+	suite.Nil(address_response.Error)
 
+	address_response = SuccessResponse{}
 	w = suite.DoRequest("DELETE", fmt.Sprintf("/address/%v", response.Addresses[0].ID), nil)
-	suite.Equal(w.Code, 404)
+	_ = json.Unmarshal(w.Body.Bytes(), &address_response)
+	suite.Equal(404, w.Code)
+	if address_response.Success != nil {
+		suite.False(*address_response.Success)
+	}
+	suite.NotNil(address_response.Error)
 
+	address_response = SuccessResponse{}
 	w = suite.DoRequest("GET", fmt.Sprintf("/address/%v", response.Addresses[0].ID), nil)
-	suite.Equal(w.Code, 404)
+	_ = json.Unmarshal(w.Body.Bytes(), &address_response)
+	suite.Equal(404, w.Code)
+	if address_response.Success != nil {
+		suite.False(*address_response.Success)
+	}
+	suite.NotNil(address_response.Error)
 
 	_ = json.Unmarshal(suite.DoRequest("GET", "/address?search=Thomp", nil).Body.Bytes(), &response)
-	suite.Equal(len(response.Addresses), 0)
+	suite.Equal(0, len(response.Addresses))
 }
 
 func TestAddressSuite(t *testing.T) {
